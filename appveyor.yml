@@ -62,7 +62,7 @@ install:
 
 build_script:
   - ps: if($env:PLATFORM -eq "x64") { $env:CMAKE_GEN_SUFFIX=" Win64" }
-  - cmake "-G%GENERATOR%%CMAKE_GEN_SUFFIX%" -DBUILD_SHARED_LIBS=%BUILD_SHARED_LIBS% -H. -B_builds
+  - cmake "-G%GENERATOR%%CMAKE_GEN_SUFFIX%" -DOPENSSL_ROOT_DIR=C:\OpenSSL-v111-Win32 -DBUILD_SHARED_LIBS=%BUILD_SHARED_LIBS% -H. -B_builds
   - cmake --build _builds --config "%CONFIGURATION%"
 
 before_test:
