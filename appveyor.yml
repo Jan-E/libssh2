@@ -33,10 +33,16 @@ environment:
     - GENERATOR: "Visual Studio 14 2015"
       BUILD_SHARED_LIBS: OFF
 
-    - GENERATOR: "Visual Studio 12 2013"
+    - GENERATOR: "Visual Studio 11 2012"
       BUILD_SHARED_LIBS: ON
 
-    - GENERATOR: "Visual Studio 12 2013"
+    - GENERATOR: "Visual Studio 11 2012"
+      BUILD_SHARED_LIBS: OFF
+
+    - GENERATOR: "Visual Studio 9 2008"
+      BUILD_SHARED_LIBS: ON
+
+    - GENERATOR: "Visual Studio 9 2008"
       BUILD_SHARED_LIBS: OFF
 
   digitalocean_access_token:
@@ -48,10 +54,11 @@ platform:
 
 configuration:
 # - Debug
-  - Release
+# - Release
+  - RelWithDebInfo
 
 matrix:
-  fast_finish: true
+  fast_finish: false
   allow_failures:
     - GENERATOR: "Visual Studio 9 2008"
       platform: x64
@@ -59,11 +66,29 @@ matrix:
 install:
   - choco install -y docker
   - choco install -y docker-machine
+  - ps: if($env:GENERATOR -eq "Visual Studio 15 2017") { $env:VC_VERSION="VC15" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 14 2015") { $env:VC_VERSION="VC14" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 11 2012") { $env:VC_VERSION="VC11" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 9 2008") { $env:VC_VERSION="VC9" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 15 2017") { $env:VSTUDIO="VS2017" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 14 2015") { $env:VSTUDIO="VS2015" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 11 2012") { $env:VSTUDIO="VS2012" }
+  - ps: if($env:GENERATOR -eq "Visual Studio 9 2008") { $env:VSTUDIO="VS2008" }
+  - cmd: call vstudio.bat %VSTUDIO% %platform%
 
 build_script:
   - ps: if($env:PLATFORM -eq "x64") { $env:CMAKE_GEN_SUFFIX=" Win64" }
-  - cmake "-G%GENERATOR%%CMAKE_GEN_SUFFIX%" -DBUILD_SHARED_LIBS=%BUILD_SHARED_LIBS% -H. -B_builds
-  - cmake --build _builds --config "%CONFIGURATION%"
+  - ps: if($env:BUILD_SHARED_LIBS -eq "ON") { $env:ZIP_SUFFIX="-dll" }
+  - ps: if($env:BUILD_SHARED_LIBS -eq "OFF") { $env:ZIP_SUFFIX="-lib" }
+  - cmd: cmake "-G%GENERATOR%%CMAKE_GEN_SUFFIX%" -DBUILD_SHARED_LIBS=%BUILD_SHARED_LIBS% -H. -B_builds
+  - cmake --build _builds --config "%CONFIGURATION%" || exit /b 0
+  - dir C:\projects\libssh2\_builds\src\%CONFIGURATION% || exit /b 0
+  - if exist C:\projects\libssh2\_builds\src\%CONFIGURATION%\libssh2.lib cd C:\projects\libssh2\_builds\src\%CONFIGURATION%
+  - if exist C:\projects\libssh2\_builds\src\%CONFIGURATION%\libssh2.lib 7z a C:\projects\libssh2\LibSSH2-%VC_VERSION%-%platform%%ZIP_SUFFIX%.zip .
+  - cd C:\projects\libssh2
+
+artifacts:
+  - path: "*.zip"
 
 before_test:
   - set DOCKER_MACHINE_NAME=appveyor-%APPVEYOR_PROJECT_SLUG%-%APPVEYOR_JOB_ID%
@@ -72,7 +97,7 @@ before_test:
   - ps: if($env:digitalocean_access_token) { docker-machine env $($env:DOCKER_MACHINE_NAME) --shell powershell | Invoke-Expression }
 
 test_script:
-  - ps: cd _builds
+  - ps: cd C:\projects\libssh2\_builds
   - ps: if($env:digitalocean_access_token) { ctest -VV -C $($env:CONFIGURATION) --output-on-failure }
 
 after_test:
