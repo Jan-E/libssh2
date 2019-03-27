@@ -143,4 +143,4 @@ on_failure:
 branches:
     only:
         - master
-        - 1.8.1
+        - 1.8.x
